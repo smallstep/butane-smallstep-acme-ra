@@ -1,0 +1,26 @@
+passwd:
+  users:
+  - name: core
+    ssh_authorized_keys:
+      - sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIaaaaaaaaaaaaaaaaaaaaaaaaaaa example@example.com
+  - name: example
+    ssh_authorized_keys:
+      - sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIaaaaaaaaaaaaaaaaaaaaaaaaaaa example@example.com
+    groups:
+      - wheel
+      - sudo
+  - name: step
+    system: true
+
+system:
+  hostname: smallstep-acme-ra
+  domainname: example.com
+stepca:
+  vars:
+    smallstep_ca_fingerprint: my_smallstep_ca_fingerprint
+    smallstep_ca_url: https://myacme.myteam.ca.smallstep.com
+    smallstep_provisioner: acme-ra
+    smallstep_provisioner_password: mysupersecretpassword
+    smallstep_ra_port: 443
+    smallstep_ra_dns_names: acme.example.com
+    smallstep_ra_url: https://acme.example.com

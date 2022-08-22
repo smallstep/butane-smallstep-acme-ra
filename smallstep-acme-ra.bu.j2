@@ -1,0 +1,129 @@
+variant: fcos
+version: 1.4.0
+passwd:
+  users:
+{%- for item in passwd.users %}
+  - name: {{ item.name }}
+{%- if item.system %}
+    system: true
+{%- endif  %}
+{%- if item.groups %}
+    groups:
+{%- for item in item.groups %}
+      - {{ item }}
+{%- endfor %}
+{%- endif %}
+{%- if item.ssh_authorized_keys %}
+    ssh_authorized_keys:
+{%- for item in item.ssh_authorized_keys %}
+      - {{ item }}
+{%- endfor %}
+{%- endif %}
+{%- endfor %}
+{%- if passwd.groups %}
+  groups:
+{%- for item in passwd.groups %}
+  - name: {{ item.name }}
+{%- endfor %}
+{%- endif %}
+
+storage:
+  directories:
+  - path: /etc/step-ca
+    mode: 0700
+    user:
+      name: step
+    group:
+      name: step
+  - path: /etc/step-ca/config
+    mode: 0700
+    user:
+      name: step
+    group:
+      name: step
+  - path: /etc/step-ca/db
+    mode: 0700
+    user:
+      name: step
+    group:
+      name: step
+
+  files:
+  - path: /etc/hostname
+    mode: 0644
+    overwrite: true
+    contents:
+      inline: {{ system.hostname }}.{{ system.domainname }}
+
+  - path: /etc/step-ca/password.txt
+    mode: 0740
+    user:
+      name: step
+    group:
+      name: step
+    overwrite: true
+    contents:
+      inline: {{ stepca.vars.smallstep_provisioner_password  }}
+
+  - path: /usr/local/bin/step-ca
+    contents:
+      source: https://mirror.quickvm.com/smallstep/step-ca/0.21.0/step-ca.gz
+      compression: gzip
+      verification:
+        hash: "sha512-ded4515fed0f2544a4f40a535d3a01ec251f0aafbb8766e30ed4b3eacb7972f6b7c60b53d9fda733dd3af5098fdf6c39ef80002aba2a6a3cb08e6f9c0c7b4a82"
+    mode: 0555
+
+  - path: /etc/systemd/system/step-ca.service
+    contents:
+      source: https://raw.githubusercontent.com/smallstep/certificates/master/systemd/step-ca.service
+      verification:
+        hash: "sha512-1500060a1007e56ce7871909c8964c51c9f1be58cff2f752caa85aa6a92198f45f93abd46e54758bd610ea51e552bfbce8a9200215874f050834bad92a647593"
+    mode: 0644
+
+  - path: /etc/step/config/ca.json
+    mode: 0640
+    overwrite: true
+    contents: |
+      {
+        "address": "{{ stepca.vars.smallstep_ra_url }}",
+        "dnsNames": ["{{ stepca.vars.smallstep_ra_dns_names }}"],
+        "db": {
+          "type": "badgerV2",
+          "dataSource": "/etc/step-ca/db"
+        },
+        "logger": {"format": "text"},
+        "authority": {
+          "type": "stepcas",
+          "certificateAuthority": "{{ stepca.vars.smallstep_ca_url }}",
+          "certificateAuthorityFingerprint": "{{ stepca.vars.smallstep_ca_fingerprint }}",
+          "certificateIssuer": {
+            "type" : "jwk",
+            "provisioner": "{{ stepca.vars.smallstep_provisioner }}"
+          },
+          "provisioners": [{
+            "type": "ACME",
+            "name": "acme"
+          }]
+        },
+        "tls": {
+          "cipherSuites": [
+            "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
+             "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
+          ],
+          "minVersion": 1.2,
+          "maxVersion": 1.3,
+          "renegotiation": false
+        }
+      }
+
+systemd:
+  units:
+  - name: step-ca.service
+    enabled: true
+    dropins:
+    - name: override.conf
+      contents: |
+        [Service]
+        ; The empty ExecStart= clears the inherited ExecStart= value
+        ExecStart=
+        ExecStart=/usr/bin/step-ca config/ca.json --issuer-password-file password.txt
