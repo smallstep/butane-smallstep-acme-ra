@@ -21,6 +21,5 @@ stepca:
     smallstep_ca_url: https://myacme.myteam.ca.smallstep.com
     smallstep_provisioner: acme-ra
     smallstep_provisioner_password: mysupersecretpassword
-    smallstep_ra_port: 443
+    smallstep_ra_address: :443
     smallstep_ra_dns_names: acme.example.com
-    smallstep_ra_url: https://acme.example.com
