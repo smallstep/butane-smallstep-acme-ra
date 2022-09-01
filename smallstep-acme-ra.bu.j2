@@ -29,6 +29,8 @@ passwd:
 
 storage:
   directories:
+  - path: /etc/step
+    mode: 0700
   - path: /etc/step-ca
     mode: 0700
     user:
@@ -55,8 +57,23 @@ storage:
     contents:
       inline: {{ system.hostname }}.{{ system.domainname }}
 
+  - path: /usr/local/bin/step
+    contents:
+      source: https://mirror.quickvm.com/smallstep/step-cli/0.21.0/step.gz
+      compression: gzip
+      verification:
+        hash: "sha512-9dede461f1b34df09022712bcea41058d6a563cfc713404f3a76effd24a624ee564813b9b4394fb9b5525ba5b991c9c0c57df6c7e1b73ef34f6e6a1c862955e4"
+    mode: 0555
+
+  - path: /etc/systemd/system/step-ca-bootstrap@.service
+    contents:
+      source: https://raw.githubusercontent.com/quickvm/smallstep-systemd-units/master/units/step-ca-bootstrap%40.service
+      verification:
+        hash: "sha512-baf075400295052b76101ad7277c48c4ff909cff3647080cf2aae3dc9f3324af0240c99341e64e98202c446b12f54ad2fa7baa50732b79b76cf539b019e3a6bb"
+    mode: 0644
+
   - path: /etc/step-ca/password.txt
-    mode: 0740
+    mode: 0640
     user:
       name: step
     group:
@@ -80,50 +97,63 @@ storage:
         hash: "sha512-1500060a1007e56ce7871909c8964c51c9f1be58cff2f752caa85aa6a92198f45f93abd46e54758bd610ea51e552bfbce8a9200215874f050834bad92a647593"
     mode: 0644
 
-  - path: /etc/step/config/ca.json
+  - path: /etc/step-ca/config/ca.json
     mode: 0640
+    user:
+      name: step
+    group:
+      name: step
     overwrite: true
-    contents: |
-      {
-        "address": "{{ stepca.vars.smallstep_ra_url }}",
-        "dnsNames": ["{{ stepca.vars.smallstep_ra_dns_names }}"],
-        "db": {
-          "type": "badgerV2",
-          "dataSource": "/etc/step-ca/db"
-        },
-        "logger": {"format": "text"},
-        "authority": {
-          "type": "stepcas",
-          "certificateAuthority": "{{ stepca.vars.smallstep_ca_url }}",
-          "certificateAuthorityFingerprint": "{{ stepca.vars.smallstep_ca_fingerprint }}",
-          "certificateIssuer": {
-            "type" : "jwk",
-            "provisioner": "{{ stepca.vars.smallstep_provisioner }}"
+    contents:
+      inline: |
+        {
+          "address": "{{ stepca.vars.smallstep_ra_address }}",
+          "dnsNames": ["{{ stepca.vars.smallstep_ra_dns_names }}"],
+          "db": {
+            "type": "badgerV2",
+            "dataSource": "/etc/step-ca/db"
           },
-          "provisioners": [{
-            "type": "ACME",
-            "name": "acme"
-          }]
-        },
-        "tls": {
-          "cipherSuites": [
-            "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
-             "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
-          ],
-          "minVersion": 1.2,
-          "maxVersion": 1.3,
-          "renegotiation": false
+          "logger": {"format": "text"},
+          "authority": {
+            "type": "stepcas",
+            "certificateAuthority": "{{ stepca.vars.smallstep_ca_url }}",
+            "certificateAuthorityFingerprint": "{{ stepca.vars.smallstep_ca_fingerprint }}",
+            "certificateIssuer": {
+              "type" : "jwk",
+              "provisioner": "{{ stepca.vars.smallstep_provisioner }}"
+            },
+            "provisioners": [{
+              "type": "ACME",
+              "name": "acme"
+            }]
+          },
+          "tls": {
+            "cipherSuites": [
+              "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
+               "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
+            ],
+            "minVersion": 1.2,
+            "maxVersion": 1.3,
+            "renegotiation": false
+          }
         }
-      }
 
 systemd:
   units:
+  - name: step-ca-bootstrap@acme-ra.service
+    enabled: true
+    dropins:
+    - name: override.conf
+      contents: |
+          [Service]
+          Environment=STEP_CA_FINGERPRINT={{ stepca.vars.smallstep_ca_fingerprint }}
+          Environment=STEP_CA_URL={{ stepca.vars.smallstep_ca_url }}
+
   - name: step-ca.service
     enabled: true
     dropins:
     - name: override.conf
       contents: |
-        [Service]
-        ; The empty ExecStart= clears the inherited ExecStart= value
-        ExecStart=
-        ExecStart=/usr/bin/step-ca config/ca.json --issuer-password-file password.txt
+          [Service]
+          ExecStart=
+          ExecStart=/usr/local/bin/step-ca config/ca.json --issuer-password-file password.txt
