@@ -47,12 +47,12 @@ system:
     length_minutes: "60"
 ```
 
-The last thing you will need to is add the smallstep CA token and provisioner password to `smallstep_ca_token` and `smallstep_provisioner_password` respectively.
+The last thing you will need to add is the smallstep CA token and provisioner password to `smallstep_ca_token` and `smallstep_provisioner_password` respectively.
 
 ```
 stepca:
-  smallstep_ca_token: step-acme-ra-token-from-smallstep.co
-  smallstep_provisioner_password: mysupersecretpassword
+  smallstep_ca_token: <step-acme-ra-token-from-smallstep.com>
+  smallstep_provisioner_password: <step-provisioner-password-from-smallstep.com>
 ```
 
 **Render the smallstep ACME RA template**
@@ -94,7 +94,7 @@ bupy template smallstep-acme-ra.bu.j2 butanevars.yaml --write smallstep-acme-ra.
 
 ### Launch smallstep ACME RA
 
-You can now take the Ignition file you have just created from the Butane template (smallstep-acme-ra.ign in this example) and use that to launch your smallstep ACME RA. Fedora CoreOS supports vast number of cloud providers and even bare metal deployments (even [Raspberry Pi 4](https://docs.fedoraproject.org/en-US/fedora-coreos/provisioning-raspberry-pi4/)!). See the [FCOS documentation](https://docs.fedoraproject.org/en-US/fedora-coreos/) for full details. Here are a few examples:
+You can now take the Ignition file you have just created from the Butane template (`smallstep-acme-ra.ign` in this example) and use that to launch your smallstep ACME RA. Fedora CoreOS supports a vast number of cloud providers and even bare metal deployments (even [Raspberry Pi 4](https://docs.fedoraproject.org/en-US/fedora-coreos/provisioning-raspberry-pi4/)!). See the [FCOS documentation](https://docs.fedoraproject.org/en-US/fedora-coreos/) for full details. Here are a few examples:
 
 **Locally on Linux**
 
@@ -135,13 +135,13 @@ CONFIG='smallstep-acme-ra.ign'
 gcloud compute instances create --metadata-from-file "user-data=${CONFIG}" --image-project "fedora-coreos-cloud" --image-family "fedora-coreos-${STREAM}" "${VM_NAME}"
 ```
 
-## Opensource
+## Open Source
 
 You can use this automation without a smallstep [Certificate Manager](https://smallstep.com/signup?product=cm) account and use it with https://github.com/smallstep/certificates. The `butanevars.yaml` file has some commented out variables that you can use to configure the Butane template to not use a token from smallstep Certificate Manager. Just comment out `smallstep_ca_token` and `smallstep_provisioner_password` and uncomment and configure the other variables. See
 
 ```
 stepca:
-  # smallstep_ca_token: step-acme-ra-token-from-smallstep.co
+  # smallstep_ca_token: <step-acme-ra-token-from-smallstep.com>
   # smallstep_provisioner_password: mysupersecretpassword
   # Manually configure a step-ca ACME RA
   smallstep_ca_fingerprint: my_smallstep_ca_fingerprint

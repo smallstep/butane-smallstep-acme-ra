@@ -28,8 +28,8 @@ stepcli:
 stepca:
   version: 0.22.1
   sha512sum: 75f36c4330c722beb0d4a051919b38b393d5e3c4c9236b6c4d8dbb7d9bdc2b6b3a0d2c4bb3fe4a960b8df2d3745fbe903d26cc764eab95883f8c6c26945c9701
-  smallstep_ca_token: step-acme-ra-token-from-smallstep.co
-  smallstep_provisioner_password: mysupersecretpassword
+  smallstep_ca_token: <step-acme-ra-token-from-smallstep.com>
+  smallstep_provisioner_password: <step-provisioner-password-from-smallstep.com>
   # Manually configure a step-ca ACME RA
   # smallstep_ca_fingerprint: my_smallstep_ca_fingerprint
   # smallstep_ca_url: https://myacme.myteam.ca.smallstep.com
