@@ -157,7 +157,7 @@ storage:
 
 systemd:
   units:
-{%- if stepca.smallstep_ca_token is defined and stepca.smallstep_ca_token %}
+{%- if stepca.smallstep_ca_token %}
   - name: step-ca-bootstrap@acme-ra.service
     enabled: true
     contents: |
@@ -213,13 +213,13 @@ systemd:
     dropins:
     - name: override.conf
       contents: |
-{%- if stepca.smallstep_ca_token is defined and stepca.smallstep_ca_token %}
+{%- if stepca.smallstep_ca_token %}
           [Unit]
           ConditionFileNotEmpty=
 {% endif %}
           [Service]
           ExecStart=
-{%- if stepca.smallstep_ca_token is defined and stepca.smallstep_ca_token %}
+{%- if stepca.smallstep_ca_token %}
           Environment=STEP_CA_TOKEN={{ stepca.smallstep_ca_token }}
           ExecStart=/usr/local/bin/step-ca --issuer-password-file password.txt
 {% else %}
