@@ -15,11 +15,24 @@ passwd:
 system:
   hostname: smallstep-acme-ra
   domainname: example.com
+  updates:
+    auto: true
+    time_zone: America/Chicago
+    rollout_wariness: 1
+    days: '[ "Mon" ]'
+    start_time: "11:00"
+    length_minutes: "60"
+stepcli:
+  version: 0.22.0
+  sha512sum: 3e0bf96614d6cdd673a18ad3add779cdae3aaab9c7e7775fc7880d4db7ff994099679efd445550446933f49b7623812b4715ee2fdfc7d27bb9bc986b98db0576
 stepca:
-  vars:
-    smallstep_ca_fingerprint: my_smallstep_ca_fingerprint
-    smallstep_ca_url: https://myacme.myteam.ca.smallstep.com
-    smallstep_provisioner: acme-ra
-    smallstep_provisioner_password: mysupersecretpassword
-    smallstep_ra_address: :443
-    smallstep_ra_dns_names: acme.example.com
+  version: 0.22.1
+  sha512sum: 75f36c4330c722beb0d4a051919b38b393d5e3c4c9236b6c4d8dbb7d9bdc2b6b3a0d2c4bb3fe4a960b8df2d3745fbe903d26cc764eab95883f8c6c26945c9701
+  smallstep_ca_token: <step-acme-ra-token-from-smallstep.com>
+  smallstep_provisioner_password: <step-provisioner-password-from-smallstep.com>
+  # Manually configure a step-ca ACME RA
+  # smallstep_ca_fingerprint: my_smallstep_ca_fingerprint
+  # smallstep_ca_url: https://myacme.myteam.ca.smallstep.com
+  # smallstep_provisioner: acme-ra
+  # smallstep_ra_address: :443
+  # smallstep_ra_dns_names: acme.example.com

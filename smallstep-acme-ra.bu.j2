@@ -57,19 +57,49 @@ storage:
     contents:
       inline: {{ system.hostname }}.{{ system.domainname }}
 
+  - path: /etc/zincati/config.d/55-updates-strategy.toml
+    contents:
+      inline: |
+        [identity]
+        rollout_wariness = {{ system.updates.rollout_wariness }}
+
+        [updates]
+        strategy = "periodic"
+        time_zone = "{{ system.updates.time_zone }}"
+
+        [[updates.periodic.window]]
+        days = {{ system.updates.days }}
+        start_time = "{{ system.updates.start_time }}"
+        length_minutes = {{ system.updates.length_minutes }}
+{% if not system.updates.auto %}
+  - path: /etc/zincati/config.d/90-disable-auto-updates.toml
+    mode: 0644
+    contents:
+      inline: |
+        [updates]
+        enabled = false
+{% endif %}
   - path: /usr/local/bin/step
     contents:
-      source: https://mirror.quickvm.com/smallstep/step-cli/0.21.0/step.gz
+      source: https://mirror.quickvm.com/smallstep/step-cli/{{ stepcli.version }}/step.gz
       compression: gzip
       verification:
-        hash: "sha512-9dede461f1b34df09022712bcea41058d6a563cfc713404f3a76effd24a624ee564813b9b4394fb9b5525ba5b991c9c0c57df6c7e1b73ef34f6e6a1c862955e4"
+        hash: "sha512-{{ stepcli.sha512sum }}"
     mode: 0555
 
-  - path: /etc/systemd/system/step-ca-bootstrap@.service
+  - path: /usr/local/bin/step-ca
     contents:
-      source: https://raw.githubusercontent.com/quickvm/smallstep-systemd-units/master/units/step-ca-bootstrap%40.service
+      source: https://mirror.quickvm.com/smallstep/step-ca/{{ stepca.version }}/step-ca.gz
+      compression: gzip
       verification:
-        hash: "sha512-baf075400295052b76101ad7277c48c4ff909cff3647080cf2aae3dc9f3324af0240c99341e64e98202c446b12f54ad2fa7baa50732b79b76cf539b019e3a6bb"
+        hash: "sha512-{{ stepca.sha512sum }}"
+    mode: 0555
+
+  - path: /etc/systemd/system/step-ca.service
+    contents:
+      source: https://raw.githubusercontent.com/smallstep/certificates/master/systemd/step-ca.service
+      verification:
+        hash: "sha512-1500060a1007e56ce7871909c8964c51c9f1be58cff2f752caa85aa6a92198f45f93abd46e54758bd610ea51e552bfbce8a9200215874f050834bad92a647593"
     mode: 0644
 
   - path: /etc/step-ca/password.txt
@@ -80,23 +110,9 @@ storage:
       name: step
     overwrite: true
     contents:
-      inline: {{ stepca.vars.smallstep_provisioner_password  }}
+      inline: {{ stepca.smallstep_provisioner_password }}
 
-  - path: /usr/local/bin/step-ca
-    contents:
-      source: https://mirror.quickvm.com/smallstep/step-ca/0.21.0/step-ca.gz
-      compression: gzip
-      verification:
-        hash: "sha512-ded4515fed0f2544a4f40a535d3a01ec251f0aafbb8766e30ed4b3eacb7972f6b7c60b53d9fda733dd3af5098fdf6c39ef80002aba2a6a3cb08e6f9c0c7b4a82"
-    mode: 0555
-
-  - path: /etc/systemd/system/step-ca.service
-    contents:
-      source: https://raw.githubusercontent.com/smallstep/certificates/master/systemd/step-ca.service
-      verification:
-        hash: "sha512-1500060a1007e56ce7871909c8964c51c9f1be58cff2f752caa85aa6a92198f45f93abd46e54758bd610ea51e552bfbce8a9200215874f050834bad92a647593"
-    mode: 0644
-
+{%- if not stepca.smallstep_ca_token %}
   - path: /etc/step-ca/config/ca.json
     mode: 0640
     user:
@@ -107,20 +123,20 @@ storage:
     contents:
       inline: |
         {
-          "address": "{{ stepca.vars.smallstep_ra_address }}",
-          "dnsNames": ["{{ stepca.vars.smallstep_ra_dns_names }}"],
+          "address": "{{ stepca.smallstep_ra_address }}",
+          "dnsNames": ["{{ stepca.smallstep_ra_dns_names }}"],
           "db": {
             "type": "badgerV2",
             "dataSource": "/etc/step-ca/db"
           },
-          "logger": {"format": "text"},
+          "logger": {"format": "json"},
           "authority": {
             "type": "stepcas",
-            "certificateAuthority": "{{ stepca.vars.smallstep_ca_url }}",
-            "certificateAuthorityFingerprint": "{{ stepca.vars.smallstep_ca_fingerprint }}",
+            "certificateAuthority": "{{ stepca.smallstep_ca_url }}",
+            "certificateAuthorityFingerprint": "{{ stepca.smallstep_ca_fingerprint }}",
             "certificateIssuer": {
               "type" : "jwk",
-              "provisioner": "{{ stepca.vars.smallstep_provisioner }}"
+              "provisioner": "{{ stepca.smallstep_provisioner }}"
             },
             "provisioners": [{
               "type": "ACME",
@@ -137,23 +153,75 @@ storage:
             "renegotiation": false
           }
         }
+{% endif %}
 
 systemd:
   units:
+{%- if stepca.smallstep_ca_token %}
+  - name: step-ca-bootstrap@acme-ra.service
+    enabled: true
+    contents: |
+      [Unit]
+      Description=Bootstrap smallstep CA
+      After=network-online.target step-ca.service
+      Wants=network-online.target step-ca.service
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=true
+      Environment=STEPPATH=/etc/step
+      ExecStart=/usr/bin/bash -c "step ca bootstrap --force --install \
+      --ca-url $(echo https://127.0.0.1:$(lsof -p $(pidof step-ca) -P|grep LISTEN|cut -d: -f2|cut -f1 -d\(|xargs)) \
+      --fingerprint $(step certificate fingerprint <(curl -s https://127.0.0.1:$(lsof -p $(pidof step-ca) -P|grep LISTEN|cut -d: -f2|cut -f1 -d\(|xargs)/roots.pem --insecure)) \
+      --context %i"
+
+      Restart=on-failure
+      RestartSec=60s
+
+      [Install]
+      WantedBy=multi-user.target
+{% else %}
   - name: step-ca-bootstrap@acme-ra.service
     enabled: true
     dropins:
     - name: override.conf
       contents: |
           [Service]
-          Environment=STEP_CA_FINGERPRINT={{ stepca.vars.smallstep_ca_fingerprint }}
-          Environment=STEP_CA_URL={{ stepca.vars.smallstep_ca_url }}
+          Environment=STEP_CA_FINGERPRINT={{ stepca.smallstep_ca_fingerprint }}
+          Environment=STEP_CA_URL={{ stepca.smallstep_ca_url }}
+    contents: |
+      [Unit]
+      Description=Bootstrap smallstep CA
+      After=network-online.target
+      Wants=network-online.target
 
+      [Service]
+      Type=oneshot
+      RemainAfterExit=true
+      Environment=STEPPATH=/etc/step
+      ExecStart=step ca bootstrap --force --install \
+      --ca-url ${STEP_CA_URL} --fingerprint ${STEP_CA_FINGERPRINT} --context %i
+
+      Restart=on-failure
+      RestartSec=60s
+
+      [Install]
+      WantedBy=multi-user.target
+{% endif %}
   - name: step-ca.service
     enabled: true
     dropins:
     - name: override.conf
       contents: |
+{%- if stepca.smallstep_ca_token %}
+          [Unit]
+          ConditionFileNotEmpty=
+{% endif %}
           [Service]
           ExecStart=
+{%- if stepca.smallstep_ca_token %}
+          Environment=STEP_CA_TOKEN={{ stepca.smallstep_ca_token }}
+          ExecStart=/usr/local/bin/step-ca --issuer-password-file password.txt
+{% else %}
           ExecStart=/usr/local/bin/step-ca config/ca.json --issuer-password-file password.txt
+{% endif %}
